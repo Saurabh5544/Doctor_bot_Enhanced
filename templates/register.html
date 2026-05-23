@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Create your Medical Chatbot account — AI-powered health assistant">
+    <title>Register — Medical Chatbot</title>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='auth.css') }}">
+</head>
+<body>
+    <!-- Animated Background Orbs -->
+    <div class="auth-bg">
+        <div class="orb"></div>
+        <div class="orb"></div>
+        <div class="orb"></div>
+    </div>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Logo -->
+            <div class="auth-logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"/>
+                    </svg>
+                </div>
+                <h1>Create Account</h1>
+                <p>Join the Medical Chatbot community</p>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash-msg {{ category }}">
+                                {% if category == 'error' %}
+                                    <i class="fas fa-exclamation-circle"></i>
+                                {% elif category == 'success' %}
+                                    <i class="fas fa-check-circle"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle"></i>
+                                {% endif %}
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Register Form -->
+            <form method="POST" action="{{ url_for('register') }}" id="register-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Choose a username" required minlength="3" autocomplete="username">
+                    <span class="input-icon"><i class="fas fa-user"></i></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+                    <span class="input-icon"><i class="fas fa-envelope"></i></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Create a strong password" required minlength="6" autocomplete="new-password">
+                    <button type="button" class="password-toggle" onclick="togglePassword('password', this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <div class="password-strength" id="password-strength">
+                        <div class="strength-bar" id="strength-bar"></div>
+                    </div>
+                    <div class="strength-label" id="strength-label"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm your password" required autocomplete="new-password">
+                    <button type="button" class="password-toggle" onclick="togglePassword('confirm_password', this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+
+                <button type="submit" class="auth-btn" id="register-btn">
+                    <i class="fas fa-user-plus"></i>&nbsp; Create Account
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+            </div>
+
+            <div class="auth-disclaimer">
+                ⚕️ This chatbot provides general health information only.<br>
+                It is not a substitute for professional medical advice.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // Password strength checker
+        const passwordInput = document.getElementById('password');
+        const strengthContainer = document.getElementById('password-strength');
+        const strengthBar = document.getElementById('strength-bar');
+        const strengthLabel = document.getElementById('strength-label');
+
+        passwordInput.addEventListener('input', function() {
+            const val = this.value;
+            if (val.length === 0) {
+                strengthContainer.classList.remove('visible');
+                strengthLabel.classList.remove('visible');
+                return;
+            }
+
+            strengthContainer.classList.add('visible');
+            strengthLabel.classList.add('visible');
+
+            let score = 0;
+            if (val.length >= 6) score++;
+            if (val.length >= 10) score++;
+            if (/[A-Z]/.test(val)) score++;
+            if (/[0-9]/.test(val)) score++;
+            if (/[^A-Za-z0-9]/.test(val)) score++;
+
+            strengthBar.className = 'strength-bar';
+            strengthLabel.className = 'strength-label visible';
+
+            if (score <= 2) {
+                strengthBar.classList.add('weak');
+                strengthLabel.classList.add('weak');
+                strengthLabel.textContent = 'Weak password';
+            } else if (score <= 3) {
+                strengthBar.classList.add('medium');
+                strengthLabel.classList.add('medium');
+                strengthLabel.textContent = 'Medium strength';
+            } else {
+                strengthBar.classList.add('strong');
+                strengthLabel.classList.add('strong');
+                strengthLabel.textContent = 'Strong password';
+            }
+        });
+
+        // Confirm password validation
+        const form = document.getElementById('register-form');
+        const confirmInput = document.getElementById('confirm_password');
+
+        form.addEventListener('submit', function(e) {
+            if (passwordInput.value !== confirmInput.value) {
+                e.preventDefault();
+                confirmInput.setCustomValidity('Passwords do not match');
+                confirmInput.reportValidity();
+            } else {
+                confirmInput.setCustomValidity('');
+            }
+        });
+
+        confirmInput.addEventListener('input', function() {
+            this.setCustomValidity('');
+        });
+
+        // Auto-dismiss flash messages
+        document.querySelectorAll('.flash-msg').forEach(msg => {
+            setTimeout(() => {
+                msg.style.opacity = '0';
+                msg.style.transform = 'translateY(-8px)';
+                setTimeout(() => msg.remove(), 300);
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

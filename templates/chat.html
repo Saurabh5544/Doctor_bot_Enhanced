@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Medical Chatbot — AI-powered health assistant with RAG">
+    <title>Medical Chatbot — Chat</title>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-layout">
+
+        <!-- ═══ Sidebar Overlay (Mobile) ═══ -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <!-- ═══ Sidebar ═══ -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"/></svg>
+                    </div>
+                    <div class="brand-text">
+                        <h2>Medical Chatbot</h2>
+                        <p>AI Health Assistant</p>
+                    </div>
+                </div>
+                <button class="new-chat-btn" onclick="startNewChat()">
+                    <i class="fas fa-plus"></i> New Chat
+                </button>
+            </div>
+
+            <div class="sidebar-sessions" id="sidebar-sessions">
+                <div class="sessions-label">Chat History</div>
+                <div id="sessions-list">
+                    <div class="no-sessions" id="no-sessions">
+                        <i class="fas fa-comments"></i>
+                        No conversations yet.<br>Start a new chat!
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar" id="user-avatar">{{ username[0]|upper }}</div>
+                    <div class="user-details">
+                        <div class="user-name">{{ username }}</div>
+                        <div class="user-status">● Online</div>
+                    </div>
+                    <a href="/logout" class="logout-btn" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ═══ Main Chat Area ═══ -->
+        <main class="chat-main">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <button class="sidebar-toggle" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="bot-info">
+                        <img src="https://i.ibb.co/fD2T54D/Female-Doctor-Avatar.png" alt="Doctor Bot" class="bot-avatar">
+                        <div>
+                            <div class="bot-name">Dr. MedBot</div>
+                            <div class="bot-status">Online</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-header-actions">
+                    <button class="header-action-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="header-action-btn" onclick="clearCurrentChat()" title="Clear current chat">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Disclaimer Banner -->
+            <div class="disclaimer-banner" id="disclaimer-banner">
+                ⚕️ For informational purposes only — not a substitute for professional medical advice.
+                <button class="dismiss-btn" onclick="dismissDisclaimer()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="messages-container" id="messages-container">
+                <!-- Welcome Message (shown when no messages) -->
+                <div class="welcome-message" id="welcome-message">
+                    <div class="welcome-icon">
+                        <img src="https://i.ibb.co/fD2T54D/Female-Doctor-Avatar.png" alt="Bot">
+                    </div>
+                    <h3>Hello, {{ username }}! 👋</h3>
+                    <p>I'm your AI medical assistant. I can help you with health questions, symptoms, treatments, and general medical information.</p>
+                    <div class="quick-prompts">
+                        <button class="quick-prompt" onclick="usePrompt(this)">What are symptoms of flu?</button>
+                        <button class="quick-prompt" onclick="usePrompt(this)">How to treat a headache?</button>
+                        <button class="quick-prompt" onclick="usePrompt(this)">What is blood pressure?</button>
+                        <button class="quick-prompt" onclick="usePrompt(this)">First aid for burns</button>
+                    </div>
+                </div>
+
+                <!-- Typing Indicator -->
+                <div class="typing-indicator" id="typing-indicator">
+                    <img src="https://i.ibb.co/fD2T54D/Female-Doctor-Avatar.png" alt="Bot" class="msg-avatar">
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-area">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="text-input" name="msg" placeholder="Type your health question..." autocomplete="off" required>
+                    <button type="button" class="input-action-btn mic-btn" id="mic-btn" title="Voice input">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button type="button" class="input-action-btn send-btn" id="send-btn" title="Send message">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════
+        // STATE
+        // ═══════════════════════════════════════════════════════════
+        let currentSessionId = generateId();
+        let isWaitingForResponse = false;
+        const botAvatarUrl = 'https://i.ibb.co/fD2T54D/Female-Doctor-Avatar.png';
+
+        // ═══════════════════════════════════════════════════════════
+        // UTILITIES
+        // ═══════════════════════════════════════════════════════════
+        function generateId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function getTimeString() {
+            const d = new Date();
+            return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            const d = new Date(dateStr);
+            const today = new Date();
+            if (d.toDateString() === today.toDateString()) return 'Today';
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('messages-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // THEME TOGGLE
+        // ═══════════════════════════════════════════════════════════
+        function toggleTheme() {
+            const html = document.documentElement;
+            const btn = document.getElementById('theme-toggle');
+            const icon = btn.querySelector('i');
+
+            if (html.getAttribute('data-theme') === 'light') {
+                html.removeAttribute('data-theme');
+                icon.classList.replace('fa-sun', 'fa-moon');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                html.setAttribute('data-theme', 'light');
+                icon.classList.replace('fa-moon', 'fa-sun');
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Load saved theme
+        (function() {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                const icon = document.querySelector('#theme-toggle i');
+                if (icon) icon.classList.replace('fa-moon', 'fa-sun');
+            }
+        })();
+
+        // ═══════════════════════════════════════════════════════════
+        // SIDEBAR
+        // ═══════════════════════════════════════════════════════════
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('visible');
+        }
+
+        function loadChatHistory() {
+            fetch('/history')
+                .then(r => r.json())
+                .then(sessions => {
+                    const list = document.getElementById('sessions-list');
+                    const noSessions = document.getElementById('no-sessions');
+
+                    if (sessions.length === 0) {
+                        noSessions.style.display = 'block';
+                        return;
+                    }
+
+                    noSessions.style.display = 'none';
+                    list.innerHTML = '';
+
+                    sessions.forEach(session => {
+                        const isActive = session.session_id === currentSessionId;
+                        const item = document.createElement('div');
+                        item.className = 'session-item' + (isActive ? ' active' : '');
+                        item.onclick = () => loadSession(session.session_id);
+                        item.innerHTML = `
+                            <span class="session-icon"><i class="fas fa-comment-dots"></i></span>
+                            <div class="session-info">
+                                <div class="session-title">${escapeHtml(session.title || 'New Chat')}</div>
+                                <div class="session-date">${formatDate(session.last_message_at)} · ${session.message_count} msgs</div>
+                            </div>
+                            <button class="session-delete" onclick="event.stopPropagation(); deleteSession('${session.session_id}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        `;
+                        list.appendChild(item);
+                    });
+                })
+                .catch(err => console.error('Failed to load history:', err));
+        }
+
+        function loadSession(sessionId) {
+            currentSessionId = sessionId;
+
+            fetch('/history/' + sessionId)
+                .then(r => r.json())
+                .then(messages => {
+                    const container = document.getElementById('messages-container');
+                    const welcome = document.getElementById('welcome-message');
+                    const typing = document.getElementById('typing-indicator');
+
+                    // Clear existing messages (keep welcome & typing indicator)
+                    container.querySelectorAll('.message').forEach(m => m.remove());
+                    welcome.style.display = 'none';
+
+                    messages.forEach(msg => {
+                        if (msg.role === 'user') {
+                            appendUserMessage(msg.message, msg.timestamp);
+                        } else {
+                            appendBotMessage(msg.message, msg.timestamp);
+                        }
+                    });
+
+                    // Move typing indicator to end
+                    container.appendChild(typing);
+                    scrollToBottom();
+                    loadChatHistory(); // Refresh sidebar active state
+
+                    // Close sidebar on mobile
+                    if (window.innerWidth <= 768) toggleSidebar();
+                });
+        }
+
+        function deleteSession(sessionId) {
+            if (!confirm('Delete this conversation?')) return;
+
+            fetch('/history/' + sessionId, { method: 'DELETE' })
+                .then(() => {
+                    if (sessionId === currentSessionId) {
+                        startNewChat();
+                    }
+                    loadChatHistory();
+                });
+        }
+
+        function startNewChat() {
+            currentSessionId = generateId();
+            const container = document.getElementById('messages-container');
+            const welcome = document.getElementById('welcome-message');
+            const typing = document.getElementById('typing-indicator');
+
+            container.querySelectorAll('.message').forEach(m => m.remove());
+            welcome.style.display = 'block';
+            container.appendChild(typing);
+            loadChatHistory();
+
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                sidebar.classList.remove('open');
+                overlay.classList.remove('visible');
+            }
+        }
+
+        function clearCurrentChat() {
+            if (!confirm('Clear current conversation?')) return;
+
+            if (currentSessionId) {
+                fetch('/history/' + currentSessionId, { method: 'DELETE' }).then(() => {
+                    startNewChat();
+                });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // DISCLAIMER
+        // ═══════════════════════════════════════════════════════════
+        function dismissDisclaimer() {
+            const banner = document.getElementById('disclaimer-banner');
+            banner.style.display = 'none';
+            localStorage.setItem('disclaimerDismissed', 'true');
+        }
+
+        (function() {
+            if (localStorage.getItem('disclaimerDismissed') === 'true') {
+                const banner = document.getElementById('disclaimer-banner');
+                if (banner) banner.style.display = 'none';
+            }
+        })();
+
+        // ═══════════════════════════════════════════════════════════
+        // MESSAGE RENDERING
+        // ═══════════════════════════════════════════════════════════
+        function appendUserMessage(text, timestamp) {
+            const time = timestamp ? new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : getTimeString();
+            const container = document.getElementById('messages-container');
+            const typing = document.getElementById('typing-indicator');
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message user';
+            msgDiv.innerHTML = `
+                <div class="msg-content">
+                    ${escapeHtml(text)}
+                    <span class="msg-time">${time}</span>
+                </div>
+            `;
+
+            container.insertBefore(msgDiv, typing);
+            scrollToBottom();
+        }
+
+        function appendBotMessage(text, timestamp) {
+            const time = timestamp ? new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : getTimeString();
+            const container = document.getElementById('messages-container');
+            const typing = document.getElementById('typing-indicator');
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message bot';
+            msgDiv.innerHTML = `
+                <img src="${botAvatarUrl}" alt="Bot" class="msg-avatar">
+                <div class="msg-content">
+                    ${escapeHtml(text)}
+                    <span class="msg-time">${time}</span>
+                </div>
+            `;
+
+            container.insertBefore(msgDiv, typing);
+            scrollToBottom();
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SEND MESSAGE
+        // ═══════════════════════════════════════════════════════════
+        function sendMessage() {
+            const input = document.getElementById('text-input');
+            const rawText = input.value.trim();
+            if (rawText === '' || isWaitingForResponse) return;
+
+            // Hide welcome message
+            document.getElementById('welcome-message').style.display = 'none';
+
+            // Display user message
+            appendUserMessage(rawText);
+            input.value = '';
+
+            // Show typing indicator
+            isWaitingForResponse = true;
+            document.getElementById('typing-indicator').classList.add('visible');
+            scrollToBottom();
+
+            // Send to backend
+            const formData = new FormData();
+            formData.append('msg', rawText);
+            formData.append('session_id', currentSessionId);
+
+            fetch('/get', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                // Hide typing indicator
+                document.getElementById('typing-indicator').classList.remove('visible');
+                isWaitingForResponse = false;
+
+                // Update session ID if returned
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                }
+
+                // Display bot response
+                appendBotMessage(data.answer);
+
+                // Speak the response
+                speak(data.answer);
+
+                // Refresh sidebar
+                loadChatHistory();
+            })
+            .catch(err => {
+                document.getElementById('typing-indicator').classList.remove('visible');
+                isWaitingForResponse = false;
+                appendBotMessage("Sorry, I'm having trouble connecting. Please try again later.");
+                console.error('Error:', err);
+            });
+        }
+
+        function usePrompt(btn) {
+            document.getElementById('text-input').value = btn.textContent;
+            sendMessage();
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SPEECH SYNTHESIS (TEXT-TO-SPEECH)
+        // ═══════════════════════════════════════════════════════════
+        const synthesis = window.speechSynthesis;
+        let voices = [];
+
+        function populateVoiceList() {
+            voices = synthesis.getVoices();
+        }
+        populateVoiceList();
+        if (synthesis.onvoiceschanged !== undefined) {
+            synthesis.onvoiceschanged = populateVoiceList;
+        }
+
+        function speak(text) {
+            if (synthesis.speaking) synthesis.cancel();
+            if (text !== '') {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onerror = (e) => console.error('Speech error:', e);
+                let selectedVoice = voices.find(v => v.name === 'Google US English') || voices.find(v => v.lang === 'en-US');
+                if (selectedVoice) utterance.voice = selectedVoice;
+                utterance.pitch = 1;
+                utterance.rate = 1;
+                synthesis.speak(utterance);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // SPEECH RECOGNITION (SPEECH-TO-TEXT)
+        // ═══════════════════════════════════════════════════════════
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+
+            document.getElementById('mic-btn').addEventListener('click', function() {
+                if (this.classList.contains('recording')) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
+
+            recognition.onstart = () => {
+                document.getElementById('mic-btn').classList.add('recording');
+                document.getElementById('text-input').setAttribute('placeholder', 'Listening...');
+            };
+
+            recognition.onend = () => {
+                document.getElementById('mic-btn').classList.remove('recording');
+                document.getElementById('text-input').setAttribute('placeholder', 'Type your health question...');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('text-input').value = transcript;
+                sendMessage();
+            };
+
+            recognition.onerror = (event) => {
+                let errorMsg = "Sorry, an error occurred with speech recognition.";
+                if (event.error === 'not-allowed') {
+                    errorMsg = "Microphone access denied. Please allow it in browser settings.";
+                } else if (event.error === 'no-speech') {
+                    errorMsg = "I didn't hear anything. Please try again.";
+                }
+                appendBotMessage(errorMsg);
+            };
+        } else {
+            document.getElementById('mic-btn').style.display = 'none';
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // EVENT LISTENERS
+        // ═══════════════════════════════════════════════════════════
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('send-btn').addEventListener('click', sendMessage);
+
+            document.getElementById('text-input').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Load chat history on page load
+            loadChatHistory();
+        });
+    </script>
+</body>
+</html>
